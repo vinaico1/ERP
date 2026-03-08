@@ -1,0 +1,453 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// USERS & ACCESS CONTROL
+// ============================================================
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  roleId    String
+  active    Boolean  @default(true)
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  role      Role       @relation(fields: [roleId], references: [id])
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  permissions String   // JSON serialized
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+
+  @@map("roles")
+}
+
+// ============================================================
+// MASTER DATA
+// ============================================================
+
+model Customer {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  name        String
+  tradeName   String?
+  email       String?
+  phone       String?
+  mobile      String?
+  document    String? // CPF/CNPJ
+  type        String  @default("company") // individual, company
+  address     String?
+  number      String?
+  complement  String?
+  neighborhood String?
+  city        String?
+  state       String?
+  zipCode     String?
+  country     String  @default("Brasil")
+  creditLimit Float   @default(0)
+  paymentTerms String?
+  notes       String?
+  active      Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  salesOrders  SalesOrder[]
+  receivables  AccountReceivable[]
+  serviceOrders ServiceOrder[]
+
+  @@map("customers")
+}
+
+model Supplier {
+  id           String  @id @default(cuid())
+  code         String  @unique
+  name         String
+  tradeName    String?
+  email        String?
+  phone        String?
+  mobile       String?
+  document     String?
+  type         String  @default("company")
+  address      String?
+  number       String?
+  complement   String?
+  neighborhood String?
+  city         String?
+  state        String?
+  zipCode      String?
+  country      String  @default("Brasil")
+  paymentTerms String?
+  bankName     String?
+  bankAgency   String?
+  bankAccount  String?
+  notes        String?
+  active       Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+  payables       AccountPayable[]
+
+  @@map("suppliers")
+}
+
+model ProductCategory {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id           String  @id @default(cuid())
+  code         String  @unique
+  name         String
+  description  String?
+  unit         String  @default("UN")
+  price        Float   @default(0)
+  cost         Float   @default(0)
+  minStock     Float   @default(0)
+  maxStock     Float   @default(0)
+  ncm          String?
+  categoryId   String?
+  active       Boolean @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category      ProductCategory?   @relation(fields: [categoryId], references: [id])
+  inventory     Inventory?
+  salesItems    SalesOrderItem[]
+  purchaseItems PurchaseOrderItem[]
+  movements     InventoryMovement[]
+
+  @@map("products")
+}
+
+model Service {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  name        String
+  description String?
+  price       Float   @default(0)
+  duration    Int?    // minutes
+  unit        String  @default("HR")
+  active      Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  serviceOrders ServiceOrder[]
+
+  @@map("services")
+}
+
+model Employee {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  name       String
+  email      String?
+  phone      String?
+  document   String?
+  position   String?
+  department String?
+  salary     Float?
+  hireDate   DateTime?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  serviceOrders ServiceOrder[]
+
+  @@map("employees")
+}
+
+// ============================================================
+// SALES
+// ============================================================
+
+model SalesOrder {
+  id           String   @id @default(cuid())
+  number       String   @unique
+  customerId   String
+  status       String   @default("draft") // draft, confirmed, invoiced, cancelled
+  subtotal     Float    @default(0)
+  discount     Float    @default(0)
+  taxes        Float    @default(0)
+  total        Float    @default(0)
+  paymentTerms String?
+  notes        String?
+  dueDate      DateTime?
+  invoicedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  customer    Customer          @relation(fields: [customerId], references: [id])
+  items       SalesOrderItem[]
+  receivables AccountReceivable[]
+
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Float
+  unitPrice Float
+  discount  Float    @default(0)
+  total     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order   SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product    @relation(fields: [productId], references: [id])
+
+  @@map("sales_order_items")
+}
+
+// ============================================================
+// PURCHASES
+// ============================================================
+
+model PurchaseOrder {
+  id           String   @id @default(cuid())
+  number       String   @unique
+  supplierId   String
+  status       String   @default("draft") // draft, sent, partial, received, cancelled
+  subtotal     Float    @default(0)
+  taxes        Float    @default(0)
+  total        Float    @default(0)
+  paymentTerms String?
+  notes        String?
+  expectedDate DateTime?
+  receivedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  supplier Supplier           @relation(fields: [supplierId], references: [id])
+  items    PurchaseOrderItem[]
+  payables AccountPayable[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Float
+  unitPrice Float
+  total     Float
+  received  Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order   PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product       @relation(fields: [productId], references: [id])
+
+  @@map("purchase_order_items")
+}
+
+// ============================================================
+// INVENTORY
+// ============================================================
+
+model Inventory {
+  id        String   @id @default(cuid())
+  productId String   @unique
+  quantity  Float    @default(0)
+  location  String?
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("inventory")
+}
+
+model InventoryMovement {
+  id        String   @id @default(cuid())
+  productId String
+  type      String   // in, out, adjustment, return
+  quantity  Float
+  balance   Float    @default(0)
+  reason    String?
+  reference String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("inventory_movements")
+}
+
+// ============================================================
+// FINANCIAL
+// ============================================================
+
+model CostCenter {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payables    AccountPayable[]
+  receivables AccountReceivable[]
+  cashFlows   CashFlow[]
+
+  @@map("cost_centers")
+}
+
+model FinancialCategory {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // income, expense
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payables    AccountPayable[]
+  receivables AccountReceivable[]
+  cashFlows   CashFlow[]
+
+  @@map("financial_categories")
+}
+
+model AccountPayable {
+  id           String    @id @default(cuid())
+  supplierId   String?
+  orderId      String?
+  categoryId   String?
+  costCenterId String?
+  description  String
+  amount       Float
+  dueDate      DateTime
+  paidDate     DateTime?
+  paidAmount   Float?
+  status       String    @default("pending") // pending, paid, overdue, cancelled
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  supplier   Supplier?         @relation(fields: [supplierId], references: [id])
+  order      PurchaseOrder?    @relation(fields: [orderId], references: [id])
+  category   FinancialCategory? @relation(fields: [categoryId], references: [id])
+  costCenter CostCenter?       @relation(fields: [costCenterId], references: [id])
+
+  @@map("accounts_payable")
+}
+
+model AccountReceivable {
+  id           String    @id @default(cuid())
+  customerId   String?
+  orderId      String?
+  categoryId   String?
+  costCenterId String?
+  description  String
+  amount       Float
+  dueDate      DateTime
+  receivedDate DateTime?
+  receivedAmount Float?
+  status       String    @default("pending") // pending, received, overdue, cancelled
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  customer   Customer?         @relation(fields: [customerId], references: [id])
+  order      SalesOrder?       @relation(fields: [orderId], references: [id])
+  category   FinancialCategory? @relation(fields: [categoryId], references: [id])
+  costCenter CostCenter?       @relation(fields: [costCenterId], references: [id])
+
+  @@map("accounts_receivable")
+}
+
+model CashFlow {
+  id           String    @id @default(cuid())
+  type         String    // income, expense
+  description  String
+  amount       Float
+  date         DateTime
+  categoryId   String?
+  costCenterId String?
+  reference    String?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  category   FinancialCategory? @relation(fields: [categoryId], references: [id])
+  costCenter CostCenter?        @relation(fields: [costCenterId], references: [id])
+
+  @@map("cashflow")
+}
+
+// ============================================================
+// SERVICE ORDERS
+// ============================================================
+
+model ServiceOrder {
+  id          String    @id @default(cuid())
+  number      String    @unique
+  serviceId   String
+  customerId  String?
+  employeeId  String?
+  status      String    @default("open") // open, in_progress, done, cancelled
+  priority    String    @default("normal") // low, normal, high, urgent
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  price       Float     @default(0)
+  description String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  service  Service   @relation(fields: [serviceId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+  employee Employee? @relation(fields: [employeeId], references: [id])
+
+  @@map("service_orders")
+}
+
+// ============================================================
+// AUDIT
+// ============================================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String   // create, update, delete, login, logout
+  entity    String
+  entityId  String?
+  oldData   String?  // JSON
+  newData   String?  // JSON
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
