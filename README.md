@@ -29,7 +29,56 @@ Sistema ERP completo com backend Node.js e frontend React.
 - Relatórios
 - Admin (usuários, perfis, logs de auditoria)
 
-## Instalação
+---
+
+## Deploy com Docker (recomendado)
+
+### Requisitos
+- Docker e Docker Compose instalados
+
+### Subir o ambiente completo
+
+```bash
+docker compose up -d --build
+```
+
+### Acesso
+
+| Serviço  | URL                          |
+|----------|------------------------------|
+| Frontend | http://localhost             |
+| Backend  | http://localhost:3001        |
+| Health   | http://localhost:3001/health |
+
+**Login padrão:** `admin@erp.com` / `admin123`
+
+### Variáveis de ambiente em produção
+
+Crie um arquivo `.env` na raiz do projeto:
+
+```env
+JWT_SECRET=sua-chave-super-secreta
+JWT_REFRESH_SECRET=sua-chave-refresh-super-secreta
+```
+
+### Comandos úteis
+
+```bash
+# Ver logs
+docker compose logs -f
+
+# Parar os containers
+docker compose down
+
+# Parar e remover o banco de dados
+docker compose down -v
+```
+
+> O banco de dados SQLite é persistido no volume `db_data` e sobrevive a reinicializações dos containers.
+
+---
+
+## Instalação local (desenvolvimento)
 
 ### Requisitos
 - Node.js 18+
@@ -60,15 +109,13 @@ chmod +x start.sh
 ./start.sh
 ```
 
-## Acesso
+### Acesso (desenvolvimento)
 
-| Serviço  | URL                        |
-|----------|----------------------------|
-| Frontend | http://localhost:5173      |
-| Backend  | http://localhost:3001      |
+| Serviço  | URL                          |
+|----------|------------------------------|
+| Frontend | http://localhost:5173        |
+| Backend  | http://localhost:3001        |
 | Health   | http://localhost:3001/health |
-
-**Login padrão:** `admin@erp.com` / `admin123`
 
 ## Variáveis de Ambiente
 
