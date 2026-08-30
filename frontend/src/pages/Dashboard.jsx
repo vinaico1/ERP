@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { reportsAPI } from '../api';
 import { formatCurrency } from '../utils/format';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 
 const StatCard = ({ title, value, sub, icon, color = 'blue', link }) => {
   const colors = {
@@ -27,16 +27,27 @@ const StatCard = ({ title, value, sub, icon, color = 'blue', link }) => {
 };
 
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [salesData, setSalesData] = useState([]);
+  const [dailyData, setDailyData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const now = new Date();
+  const [dayMonth, setDayMonth] = useState(now.getMonth() + 1);
+  const [dayYear, setDayYear] = useState(now.getFullYear());
+
+  const loadDaily = useCallback(() => {
+    reportsAPI.salesByDay({ year: dayYear, month: dayMonth })
+      .then(r => setDailyData(r.data.data))
+      .catch(console.error);
+  }, [dayMonth, dayYear]);
 
   useEffect(() => {
     Promise.all([
       reportsAPI.dashboard(),
-      reportsAPI.salesByPeriod({ year: new Date().getFullYear() })
+      reportsAPI.salesByPeriod({ year: now.getFullYear() })
     ]).then(([dashRes, salesRes]) => {
       setData(dashRes.data.data);
       const sales = salesRes.data.data.map((s, i) => ({ month: MONTHS[i], total: s.total, count: s.count }));
@@ -44,6 +55,19 @@ export default function Dashboard() {
     }).catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { loadDaily(); }, [loadDaily]);
+
+  function prevMonth() {
+    if (dayMonth === 1) { setDayMonth(12); setDayYear(y => y - 1); }
+    else setDayMonth(m => m - 1);
+  }
+  function nextMonth() {
+    const isCurrentMonth = dayYear === now.getFullYear() && dayMonth === now.getMonth() + 1;
+    if (isCurrentMonth) return;
+    if (dayMonth === 12) { setDayMonth(1); setDayYear(y => y + 1); }
+    else setDayMonth(m => m + 1);
+  }
 
   if (loading) return (
     <div className="flex justify-center items-center h-64">
@@ -138,6 +162,48 @@ export default function Dashboard() {
                 <div className="text-2xl">🔩</div>
               </Link>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Vendas por dia do mês */}
+      <div className="card">
+        <div className="card-header flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700">Vendas por Dia — {MONTH_NAMES[dayMonth - 1]} {dayYear}</h3>
+          <div className="flex items-center gap-2">
+            <button onClick={prevMonth} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500 transition-colors">‹</button>
+            <span className="text-xs text-gray-500 min-w-[90px] text-center">{MONTH_NAMES[dayMonth - 1]} {dayYear}</span>
+            <button
+              onClick={nextMonth}
+              disabled={dayYear === now.getFullYear() && dayMonth === now.getMonth() + 1}
+              className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-gray-500 disabled:opacity-30 transition-colors"
+            >›</button>
+          </div>
+        </div>
+        <div className="p-4">
+          {dailyData.length === 0 ? (
+            <div className="text-center text-gray-400 py-8 text-sm">Sem dados para o período</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={dailyData} barSize={10}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="day" tick={{ fontSize: 10 }} interval={1} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={45} />
+                <Tooltip
+                  formatter={(v, name) => [formatCurrency(v), name === 'pdv' ? 'PDV' : name === 'erp' ? 'ERP' : 'Total']}
+                  labelFormatter={d => `Dia ${d}`}
+                />
+                <Legend formatter={v => v === 'pdv' ? 'PDV' : 'ERP'} />
+                <Bar dataKey="erp" stackId="a" fill="#0070F2" name="erp" radius={[0,0,0,0]} />
+                <Bar dataKey="pdv" stackId="a" fill="#7c3aed" name="pdv" radius={[3,3,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+          <div className="mt-2 flex gap-4 text-xs text-gray-500">
+            <span>Total do mês: <strong className="text-gray-800">{formatCurrency(dailyData.reduce((s, d) => s + d.total, 0))}</strong></span>
+            <span>Pedidos: <strong className="text-gray-800">{dailyData.reduce((s, d) => s + d.count, 0)}</strong></span>
+            <span className="text-purple-600">PDV: <strong>{formatCurrency(dailyData.reduce((s, d) => s + d.pdv, 0))}</strong></span>
+            <span className="text-blue-600">ERP: <strong>{formatCurrency(dailyData.reduce((s, d) => s + d.erp, 0))}</strong></span>
           </div>
         </div>
       </div>

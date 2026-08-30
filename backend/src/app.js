@@ -3,7 +3,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
-const rateLimit = require('express-rate-limit');
 
 const errorHandler = require('./middleware/errorHandler');
 
@@ -22,24 +21,34 @@ const inventoryRoutes = require('./modules/inventory/inventory.routes');
 const financialRoutes = require('./modules/financial/financial.routes');
 const reportsRoutes = require('./modules/reports/reports.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
+const nfeRoutes = require('./modules/nfe/nfe.routes');
+const pdvRoutes = require('./modules/pdv/pdv.routes');
 
 const app = express();
 
 app.use(helmet());
 
+// Aceita múltiplas origens separadas por vírgula em cada variável (ex: domínio
+// de produção + previews do Vercel), além dos defaults de desenvolvimento.
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:5173',
+  process.env.PDV_URL || 'http://localhost:5174',
+  ...(process.env.EXTRA_ALLOWED_ORIGINS ? process.env.EXTRA_ALLOWED_ORIGINS.split(',').map(o => o.trim()) : [])
+].flatMap(o => o.split(',').map(s => s.trim())).filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 500,
-  message: { error: 'Muitas requisições. Tente novamente em 15 minutos.' }
-});
-app.use('/api/', limiter);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -68,6 +77,8 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/financial', financialRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/nfe', nfeRoutes);
+app.use('/api/pdv', pdvRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: `Rota ${req.method} ${req.path} não encontrada` });

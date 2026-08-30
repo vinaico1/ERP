@@ -130,6 +130,7 @@ exports.salesByCustomer = async (req, res, next) => {
 
     const byCustomer = {};
     sales.forEach(s => {
+      if (!s.customerId || !s.customer) return; // ignora Consumidor Final
       if (!byCustomer[s.customerId]) {
         byCustomer[s.customerId] = { customerId: s.customerId, customer: s.customer.name, total: 0, count: 0 };
       }
@@ -208,6 +209,42 @@ exports.topProducts = async (req, res, next) => {
     });
     const result = Object.values(byProduct).sort((a, b) => b.total - a.total).slice(0, Number(limit));
     return success(res, result);
+  } catch (err) { next(err); }
+};
+
+exports.salesByDay = async (req, res, next) => {
+  try {
+    const now = new Date();
+    const year = parseInt(req.query.year) || now.getFullYear();
+    const month = parseInt(req.query.month) || (now.getMonth() + 1);
+
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0, 23, 59, 59);
+    const daysInMonth = endOfMonth.getDate();
+
+    const sales = await prisma.salesOrder.findMany({
+      where: {
+        createdAt: { gte: startOfMonth, lte: endOfMonth },
+        status: { not: 'cancelled' }
+      },
+      select: { total: true, createdAt: true, origin: true }
+    });
+
+    const byDay = {};
+    for (let d = 1; d <= daysInMonth; d++) {
+      byDay[d] = { day: d, total: 0, count: 0, pdv: 0, erp: 0 };
+    }
+    sales.forEach(s => {
+      const d = new Date(s.createdAt).getDate();
+      if (byDay[d]) {
+        byDay[d].total += s.total;
+        byDay[d].count++;
+        if (s.origin === 'pdv') byDay[d].pdv += s.total;
+        else byDay[d].erp += s.total;
+      }
+    });
+
+    return success(res, Object.values(byDay));
   } catch (err) { next(err); }
 };
 

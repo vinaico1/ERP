@@ -17,7 +17,8 @@ exports.list = async (req, res, next) => {
     const where = {};
     if (search) where.OR = [
       { name: { contains: search } }, { code: { contains: search } },
-      { email: { contains: search } }, { document: { contains: search } }
+      { email: { contains: search } }, { document: { contains: search } },
+      { phone: { contains: search } }
     ];
     if (active !== undefined) where.active = active === 'true';
     if (type) where.type = type;

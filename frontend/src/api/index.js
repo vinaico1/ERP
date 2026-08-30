@@ -1,7 +1,10 @@
 import axios from 'axios';
 
+// Em produção o frontend é um projeto Vercel separado do backend, então
+// precisa da URL absoluta da API (VITE_API_URL). Em dev local mantém '/api'
+// (proxy do Vite).
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api',
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' }
 });
@@ -22,7 +25,7 @@ api.interceptors.response.use(
       original._retry = true;
       try {
         const refreshToken = localStorage.getItem('erp_refresh_token');
-        const { data } = await axios.post('/api/auth/refresh', { refreshToken });
+        const { data } = await axios.post(`${api.defaults.baseURL}/auth/refresh`, { refreshToken });
         localStorage.setItem('erp_token', data.data.token);
         localStorage.setItem('erp_refresh_token', data.data.refreshToken);
         original.headers.Authorization = `Bearer ${data.data.token}`;
@@ -154,6 +157,7 @@ export const serviceOrdersAPI = {
 export const reportsAPI = {
   dashboard: () => api.get('/reports/dashboard'),
   salesByPeriod: (params) => api.get('/reports/sales-by-period', { params }),
+  salesByDay: (params) => api.get('/reports/sales-by-day', { params }),
   salesByCustomer: (params) => api.get('/reports/sales-by-customer', { params }),
   inventorySummary: () => api.get('/reports/inventory-summary'),
   financialSummary: (params) => api.get('/reports/financial-summary', { params }),

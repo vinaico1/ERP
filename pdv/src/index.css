@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #dde9f8;
+  color: #1a2744;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: #c8d9f0; }
+::-webkit-scrollbar-thumb { background: #7ba3d4; border-radius: 3px; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.15s ease-out; }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.slide-up { animation: slideUp 0.2s ease-out; }
+
+/* Botões */
+.btn-pdv {
+  @apply px-4 py-2 rounded font-semibold transition-all duration-150 active:scale-95 focus:outline-none;
+}
+.btn-primary  { @apply btn-pdv bg-blue-700 hover:bg-blue-600 text-white; }
+.btn-success  { @apply btn-pdv bg-green-600 hover:bg-green-500 text-white; }
+.btn-danger   { @apply btn-pdv bg-red-600 hover:bg-red-500 text-white; }
+.btn-ghost    { @apply btn-pdv bg-white hover:bg-gray-100 text-gray-700 border border-gray-300; }
+.btn-orange   { @apply btn-pdv bg-orange-500 hover:bg-orange-400 text-white; }
+
+/* Inputs */
+.input-pdv {
+  @apply w-full bg-white border border-gray-300 text-gray-800 rounded px-3 py-1.5
+         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+         placeholder-gray-400 text-sm;
+}
+
+/* Card */
+.card-pdv { @apply bg-white rounded border border-gray-200 shadow-sm; }

@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "postinstall": "prisma generate",
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate",
     "db:seed": "node prisma/seed.js",
     "db:studio": "npx prisma studio",
-    "db:reset": "npx prisma migrate reset --force && node prisma/seed.js"
+    "db:reset": "npx prisma migrate reset --force && node prisma/seed.js",
+    "db:deploy": "npx prisma migrate deploy"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",

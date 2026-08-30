@@ -20,11 +20,12 @@ const calcTotals = (items) => {
 exports.list = async (req, res, next) => {
   try {
     const { page, limit, skip } = getPagination(req.query);
-    const { search, status, customerId, startDate, endDate } = req.query;
+    const { search, status, customerId, origin, startDate, endDate } = req.query;
     const where = {};
     if (search) where.OR = [{ number: { contains: search } }, { customer: { name: { contains: search } } }];
     if (status) where.status = status;
     if (customerId) where.customerId = customerId;
+    if (origin) where.origin = origin;
     if (startDate || endDate) {
       where.createdAt = {};
       if (startDate) where.createdAt.gte = new Date(startDate);
@@ -59,8 +60,7 @@ exports.getOne = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
   try {
-    const { customerId, items, paymentTerms, notes, dueDate } = req.body;
-    if (!customerId) return error(res, 'Cliente é obrigatório');
+    const { customerId, items, paymentTerms, paymentMethod, origin, notes, dueDate, discount: globalDiscount } = req.body;
     if (!items || !items.length) return error(res, 'Itens são obrigatórios');
 
     const number = await generateNumber();
@@ -68,11 +68,19 @@ exports.create = async (req, res, next) => {
       ...i,
       total: (i.quantity * i.unitPrice) - (i.discount || 0)
     }));
-    const { subtotal, discount, total } = calcTotals(itemsWithTotal);
+    const { subtotal, discount: itemDiscount, total: itemTotal } = calcTotals(itemsWithTotal);
+    // Aplica desconto global (PDV) sobre o subtotal líquido dos itens
+    const globalDiscountValue = parseFloat(globalDiscount) || 0;
+    const discount = itemDiscount + globalDiscountValue;
+    const total = itemTotal - globalDiscountValue;
 
     const data = await prisma.salesOrder.create({
       data: {
-        number, customerId, subtotal, discount, total, paymentTerms, notes,
+        number, customerId: customerId || null,
+        subtotal, discount, total,
+        paymentTerms, paymentMethod: paymentMethod || null,
+        origin: origin || 'erp',
+        notes,
         dueDate: dueDate ? new Date(dueDate) : null,
         items: { create: itemsWithTotal }
       },
@@ -125,17 +133,19 @@ exports.updateStatus = async (req, res, next) => {
 
     const data = await prisma.salesOrder.update({ where: { id: req.params.id }, data: updateData });
 
-    // When invoiced, generate receivable
+    // When invoiced, generate receivable (only for ERP/non-PDV sales with customer)
     if (status === 'invoiced' && existing.status !== 'invoiced') {
-      await prisma.accountReceivable.create({
-        data: {
-          customerId: data.customerId,
-          orderId: data.id,
-          description: `Venda ${data.number}`,
-          amount: data.total,
-          dueDate: data.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        }
-      });
+      if (data.origin !== 'pdv' && data.customerId) {
+        await prisma.accountReceivable.create({
+          data: {
+            customerId: data.customerId,
+            orderId: data.id,
+            description: `Venda ${data.number}`,
+            amount: data.total,
+            dueDate: data.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+          }
+        });
+      }
       // Move stock out
       const items = await prisma.salesOrderItem.findMany({ where: { orderId: data.id } });
       for (const item of items) {

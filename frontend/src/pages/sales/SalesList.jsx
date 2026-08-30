@@ -13,22 +13,28 @@ export default function SalesList() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [origin, setOrigin] = useState('');
   const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await salesAPI.list({ search, status, page, limit: 15 });
+      const res = await salesAPI.list({ search, status, origin, page, limit: 15 });
       setData(res.data.data); setPagination(res.data.pagination);
     } finally { setLoading(false); }
-  }, [search, status, page]);
+  }, [search, status, origin, page]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { setPage(1); }, [search, status]);
+  useEffect(() => { setPage(1); }, [search, status, origin]);
 
   const columns = [
-    { header: 'Número', render: r => <span className="font-mono font-medium text-primary-600">{r.number}</span> },
-    { header: 'Cliente', render: r => r.customer?.name || '-' },
+    { header: 'Número', render: r => (
+      <div className="flex items-center gap-1.5">
+        <span className="font-mono font-medium text-primary-600">{r.number}</span>
+        {r.origin === 'pdv' && <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">PDV</span>}
+      </div>
+    )},
+    { header: 'Cliente', render: r => r.customer?.name || <span className="text-gray-400 italic text-xs">Consumidor Final</span> },
     { header: 'Status', render: r => <StatusBadge status={r.status} /> },
     { header: 'Total', render: r => <span className="font-semibold">{formatCurrency(r.total)}</span> },
     { header: 'Data', render: r => formatDate(r.createdAt) },
@@ -60,6 +66,11 @@ export default function SalesList() {
             <option value="confirmed">Confirmado</option>
             <option value="invoiced">Faturado</option>
             <option value="cancelled">Cancelado</option>
+          </select>
+          <select className="form-select w-36" value={origin} onChange={e => setOrigin(e.target.value)}>
+            <option value="">Todas origens</option>
+            <option value="erp">ERP</option>
+            <option value="pdv">PDV</option>
           </select>
         </div>
         <Table columns={columns} data={data} loading={loading} />
